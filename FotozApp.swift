@@ -7,6 +7,7 @@ import SwiftUI
 
 @main
 struct FotozApp: App {
+    @UIApplicationDelegateAdaptor(FotozAppDelegate.self) private var appDelegate
     @AppStorage("darkModeEnabled") private var darkModeEnabled = false
     @State private var showWelcome = true
 

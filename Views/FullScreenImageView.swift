@@ -87,6 +87,12 @@ struct FullScreenImageView: View {
                 }
             }
         }
+        .onAppear {
+            OrientationLock.beginFullscreenAllowingLandscape()
+        }
+        .onDisappear {
+            OrientationLock.endFullscreen()
+        }
     }
 
     private var topBar: some View {

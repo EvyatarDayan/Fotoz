@@ -341,5 +341,11 @@ private struct TrashFullScreenImageView: View {
             }
         }
         .statusBarHidden(true)
+        .onAppear {
+            OrientationLock.beginFullscreenAllowingLandscape()
+        }
+        .onDisappear {
+            OrientationLock.endFullscreen()
+        }
     }
 }

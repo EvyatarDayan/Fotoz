@@ -86,7 +86,7 @@ struct RatingFilterBar: View {
             .accessibilityLabel("Clear rating filter")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .frame(height: 48)
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
