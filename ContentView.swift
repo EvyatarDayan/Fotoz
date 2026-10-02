@@ -6,9 +6,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Bindable var viewModel: LibraryViewModel
     var revealFolderItems = true
 
-    @State private var viewModel = LibraryViewModel()
     @State private var path: [UUID] = []
 
     var body: some View {
@@ -80,7 +80,9 @@ struct ContentView: View {
     }
 
     private func syncNavigationForAppReadiness() {
-        viewModel.ensureDefaultFolder()
+        if !viewModel.isDecoySession {
+            viewModel.ensureDefaultFolder()
+        }
         path = []
         viewModel.allowsAutomaticClipboardImport = false
         viewModel.wantsClipboardImportPrompt = false
@@ -88,5 +90,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(viewModel: LibraryViewModel())
 }

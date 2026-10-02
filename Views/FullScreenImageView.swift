@@ -9,9 +9,9 @@ import UIKit
 struct FullScreenImageView: View {
     @Bindable var viewModel: LibraryViewModel
     let images: [LibraryImage]
-    @State private var currentID: LibraryImage.ID
     @Environment(\.dismiss) private var dismiss
 
+    @State private var currentID: LibraryImage.ID?
     @State private var showChrome = true
     @State private var sharePayload: SharePayload?
     @State private var showMoveSheet = false
@@ -24,7 +24,8 @@ struct FullScreenImageView: View {
     }
 
     private var currentImage: LibraryImage? {
-        viewModel.image(with: currentID)
+        guard let currentID else { return images.first }
+        return viewModel.image(with: currentID)
             ?? images.first(where: { $0.id == currentID })
             ?? images.first
     }
@@ -37,21 +38,16 @@ struct FullScreenImageView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            TabView(selection: $currentID) {
-                ForEach(images) { image in
-                    ZoomableImagePage(
-                        uiImage: viewModel.uiImage(for: image),
-                        isActive: image.id == currentID,
-                        onSingleTap: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showChrome.toggle()
-                            }
-                        }
-                    )
-                    .tag(image.id)
+            VerticalImageBrowser(
+                images: images,
+                currentID: $currentID,
+                imageProvider: { viewModel.uiImage(for: $0) },
+                onSingleTap: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showChrome.toggle()
+                    }
                 }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            )
             .ignoresSafeArea()
 
             if showChrome {
@@ -166,7 +162,8 @@ struct FullScreenImageView: View {
 
     private var bottomBar: some View {
         Group {
-            if let index = images.firstIndex(where: { $0.id == currentID }) {
+            if let currentID,
+               let index = images.firstIndex(where: { $0.id == currentID }) {
                 Text("\(index + 1) / \(images.count)")
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(.white)
@@ -181,101 +178,5 @@ struct FullScreenImageView: View {
     private func shareCurrent() {
         guard let currentImage, let uiImage = viewModel.uiImage(for: currentImage) else { return }
         sharePayload = SharePayload(items: [uiImage])
-    }
-}
-
-private struct ZoomableImagePage: View {
-    let uiImage: UIImage?
-    let isActive: Bool
-    let onSingleTap: () -> Void
-
-    @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
-
-    private var isZoomed: Bool {
-        scale > 1.01
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                if let uiImage {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(scale)
-                        .offset(offset)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                if isZoomed {
-                                    resetTransform()
-                                } else {
-                                    scale = 2.5
-                                    lastScale = 2.5
-                                }
-                            }
-                        }
-                        .onTapGesture(count: 1) {
-                            onSingleTap()
-                        }
-                        .gesture(magnificationGesture)
-                        .gesture(isZoomed ? panGesture : nil)
-                } else {
-                    ProgressView()
-                        .tint(.white)
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
-            // When not zoomed, let TabView own horizontal swipes for paging.
-            .contentShape(Rectangle())
-        }
-        .onChange(of: isActive) { _, active in
-            if !active {
-                resetTransform()
-            }
-        }
-        .onChange(of: uiImage) { _, _ in
-            resetTransform()
-        }
-    }
-
-    private var magnificationGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let next = lastScale * value.magnification
-                scale = min(max(next, 1), 5)
-            }
-            .onEnded { _ in
-                lastScale = scale
-                if scale <= 1.01 {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        resetTransform()
-                    }
-                }
-            }
-    }
-
-    private var panGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                offset = CGSize(
-                    width: lastOffset.width + value.translation.width,
-                    height: lastOffset.height + value.translation.height
-                )
-            }
-            .onEnded { _ in
-                lastOffset = offset
-            }
-    }
-
-    private func resetTransform() {
-        scale = 1
-        lastScale = 1
-        offset = .zero
-        lastOffset = .zero
     }
 }

@@ -286,12 +286,15 @@ struct DeletedItemsView: View {
 private struct TrashFullScreenImageView: View {
     @Bindable var viewModel: LibraryViewModel
     let images: [LibraryImage]
-    @State private var currentID: LibraryImage.ID
+    private let openingID: LibraryImage.ID
+    @State private var currentID: LibraryImage.ID?
+    @State private var didSettleOpening = false
     @Environment(\.dismiss) private var dismiss
 
     init(viewModel: LibraryViewModel, images: [LibraryImage], startID: LibraryImage.ID) {
         self.viewModel = viewModel
         self.images = images
+        self.openingID = startID
         _currentID = State(initialValue: startID)
     }
 
@@ -299,23 +302,46 @@ private struct TrashFullScreenImageView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            TabView(selection: $currentID) {
-                ForEach(images) { image in
-                    Group {
-                        if let uiImage = viewModel.trashUIImage(for: image) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                        } else {
-                            ProgressView()
-                                .tint(.white)
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 0) {
+                    ForEach(images) { image in
+                        ZStack {
+                            Color.black
+                            if let uiImage = viewModel.trashUIImage(for: image) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFit()
+                            } else {
+                                ProgressView()
+                                    .tint(.white)
+                            }
                         }
+                        .containerRelativeFrame([.horizontal, .vertical])
+                        .background(Color.black)
+                        .id(image.id)
                     }
-                    .tag(image.id)
                 }
+                .scrollTargetLayout()
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $currentID)
+            .scrollIndicators(.hidden)
             .ignoresSafeArea()
+            .onChange(of: currentID) { _, newID in
+                guard !didSettleOpening, newID != openingID else { return }
+                currentID = openingID
+            }
+            .task(id: openingID) {
+                currentID = openingID
+                await Task.yield()
+                try? await Task.sleep(for: .milliseconds(32))
+                if images.first?.id != openingID {
+                    currentID = nil
+                    await Task.yield()
+                    currentID = openingID
+                }
+                didSettleOpening = true
+            }
 
             VStack {
                 HStack {

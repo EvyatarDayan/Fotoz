@@ -9,8 +9,15 @@ struct SettingsView: View {
     @Bindable var viewModel: LibraryViewModel
     @Environment(\.dismiss) private var dismiss
     @AppStorage("darkModeEnabled") private var darkModeEnabled = false
+    @AppStorage(AppPasswordSettings.protectionEnabledKey) private var passwordProtectionEnabled = false
+
     @State private var showResetDialog = false
     @State private var resetConfirmationText = ""
+    @State private var showSetPasswordDialog = false
+    @State private var passwordDraft = ""
+    @State private var confirmPasswordDraft = ""
+    @State private var passwordError: String?
+    @State private var isChangingPassword = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,11 +43,59 @@ struct SettingsView: View {
                     }
                     .tint(.green)
                     .padding(.vertical, 4)
-                } header: {
-                    Text("Preferences")
-                }
 
-                Section {
+                    Toggle(isOn: passwordProtectionBinding) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 30, height: 30)
+                                .background(Color.indigo, in: Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Password Protection")
+                                Text(
+                                    passwordProtectionEnabled
+                                        ? "Required on welcome screen"
+                                        : "Off — welcome opens freely"
+                                )
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .tint(.green)
+                    .padding(.vertical, 4)
+                    .disabled(viewModel.isDecoySession)
+
+                    if passwordProtectionEnabled {
+                        Button {
+                            isChangingPassword = true
+                            passwordDraft = ""
+                            confirmPasswordDraft = ""
+                            passwordError = nil
+                            showSetPasswordDialog = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color.teal, in: Circle())
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Change Password")
+                                    Text("Update the welcome password")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isDecoySession)
+                    }
+
                     NavigationLink {
                         LibraryStatisticsView(viewModel: viewModel)
                     } label: {
@@ -60,11 +115,7 @@ struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                } header: {
-                    Text("Library")
-                }
 
-                Section {
                     NavigationLink {
                         DeletedItemsView(viewModel: viewModel)
                     } label: {
@@ -88,11 +139,7 @@ struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                } header: {
-                    Text("Deleted Items")
-                }
 
-                Section {
                     Button {
                         resetConfirmationText = ""
                         showResetDialog = true
@@ -115,8 +162,7 @@ struct SettingsView: View {
                         .padding(.vertical, 4)
                     }
                     .buttonStyle(.plain)
-                } header: {
-                    Text("Danger Zone")
+                    .disabled(viewModel.isDecoySession)
                 }
             }
             .listStyle(.insetGrouped)
@@ -143,12 +189,81 @@ struct SettingsView: View {
                         showResetDialog = false
                         resetConfirmationText = ""
                         viewModel.resetApp()
+                        passwordProtectionEnabled = false
                         dismiss()
                     }
                 )
                 .ignoresSafeArea()
                 .zIndex(1)
             }
+
+            if showSetPasswordDialog {
+                SetPasswordDialog(
+                    title: isChangingPassword ? "Change Password" : "Set Password",
+                    password: $passwordDraft,
+                    confirmPassword: $confirmPasswordDraft,
+                    errorMessage: passwordError,
+                    onCancel: {
+                        showSetPasswordDialog = false
+                        passwordDraft = ""
+                        confirmPasswordDraft = ""
+                        passwordError = nil
+                        if !isChangingPassword {
+                            passwordProtectionEnabled = false
+                        }
+                        isChangingPassword = false
+                    },
+                    onConfirm: {
+                        savePasswordFromDialog()
+                    }
+                )
+                .ignoresSafeArea()
+                .zIndex(2)
+            }
         }
+    }
+
+    private var passwordProtectionBinding: Binding<Bool> {
+        Binding(
+            get: { passwordProtectionEnabled },
+            set: { newValue in
+                if newValue {
+                    if AppPasswordSettings.storedPassword.isEmpty {
+                        isChangingPassword = false
+                        passwordDraft = ""
+                        confirmPasswordDraft = ""
+                        passwordError = nil
+                        passwordProtectionEnabled = true
+                        showSetPasswordDialog = true
+                    } else {
+                        passwordProtectionEnabled = true
+                    }
+                } else {
+                    AppPasswordSettings.setProtectionEnabled(false)
+                    passwordProtectionEnabled = false
+                }
+            }
+        )
+    }
+
+    private func savePasswordFromDialog() {
+        let trimmed = passwordDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 4 else {
+            passwordError = "Use at least 4 characters."
+            return
+        }
+        guard passwordDraft == confirmPasswordDraft else {
+            passwordError = "Passwords don’t match."
+            return
+        }
+
+        AppPasswordSettings.setPassword(passwordDraft)
+        AppPasswordSettings.setProtectionEnabled(true)
+        passwordProtectionEnabled = true
+        showSetPasswordDialog = false
+        passwordDraft = ""
+        confirmPasswordDraft = ""
+        passwordError = nil
+        isChangingPassword = false
     }
 }

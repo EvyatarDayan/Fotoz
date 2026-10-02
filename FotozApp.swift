@@ -9,16 +9,23 @@ import SwiftUI
 struct FotozApp: App {
     @UIApplicationDelegateAdaptor(FotozAppDelegate.self) private var appDelegate
     @AppStorage("darkModeEnabled") private var darkModeEnabled = false
+    @State private var viewModel = LibraryViewModel()
     @State private var showWelcome = true
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView(revealFolderItems: !showWelcome)
-                    .allowsHitTesting(!showWelcome)
+                ContentView(
+                    viewModel: viewModel,
+                    revealFolderItems: !showWelcome
+                )
+                .allowsHitTesting(!showWelcome)
 
                 if showWelcome {
-                    WelcomeView {
+                    WelcomeView { unlocked in
+                        if !unlocked {
+                            viewModel.enterDecoySession()
+                        }
                         showWelcome = false
                     }
                     .ignoresSafeArea()
