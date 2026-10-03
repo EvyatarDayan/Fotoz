@@ -80,9 +80,7 @@ struct ContentView: View {
     }
 
     private func syncNavigationForAppReadiness() {
-        if !viewModel.isDecoySession {
-            viewModel.ensureDefaultFolder()
-        }
+        viewModel.ensureDefaultFolder()
         path = []
         viewModel.allowsAutomaticClipboardImport = false
         viewModel.wantsClipboardImportPrompt = false

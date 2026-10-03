@@ -19,14 +19,15 @@ final class LibraryViewModel {
     private(set) var folders: [Folder] = []
     private(set) var images: [LibraryImage] = []
     private(set) var deletedImages: [DeletedImage] = []
-    /// Wrong welcome password: empty in-memory library; disk library is untouched.
+    /// Wrong / empty welcome password: uses a separate on-disk decoy library.
     private(set) var isDecoySession = false
     var errorMessage: String?
     var infoMessage: String?
     var allowsAutomaticClipboardImport = false
     var wantsClipboardImportPrompt = false
 
-    private let store: ImageLibraryStore
+    private let decoyStore = ImageLibraryStore.decoy
+    private var store: ImageLibraryStore
 
     init(store: ImageLibraryStore? = nil) {
         self.store = store ?? .shared
@@ -38,19 +39,17 @@ final class LibraryViewModel {
         folders.first
     }
 
-    /// Shows an empty library without reading or writing the real FotozLibrary.
+    /// Switch to the persistent decoy library (wrong / empty password).
     func enterDecoySession() {
         isDecoySession = true
-        folders = []
-        images = []
-        deletedImages = []
+        store = decoyStore
         wantsClipboardImportPrompt = false
         allowsAutomaticClipboardImport = false
         errorMessage = nil
+        reload()
     }
 
     func reload() {
-        guard !isDecoySession else { return }
         let snapshot = store.load()
         folders = snapshot.folders.sorted { $0.createdAt > $1.createdAt }
         images = snapshot.images.sorted { $0.createdAt > $1.createdAt }
@@ -58,32 +57,21 @@ final class LibraryViewModel {
     }
 
     func refreshDeletedImages() {
-        guard !isDecoySession else {
-            deletedImages = []
-            return
-        }
         deletedImages = store.loadDeletedImages()
     }
 
     /// Disk bytes used by active library images.
     var libraryBytesOnDisk: Int64 {
-        guard !isDecoySession else { return 0 }
-        return store.directorySize(at: store.imagesDirectoryURL)
+        store.directorySize(at: store.imagesDirectoryURL)
     }
 
     /// Disk bytes used by trash.
     var trashBytesOnDisk: Int64 {
-        guard !isDecoySession else { return 0 }
-        return store.directorySize(at: store.trashDirectoryURL)
+        store.directorySize(at: store.trashDirectoryURL)
     }
 
     @discardableResult
     func ensureDefaultFolder() -> Folder {
-        if isDecoySession {
-            // Keep decoy empty (no albums). Callers that need an ID get an ephemeral folder.
-            return Folder(name: "Sample")
-        }
-
         if folders.isEmpty {
             let folder = Folder(name: "Sample")
             folders = [folder]
@@ -194,7 +182,6 @@ final class LibraryViewModel {
     }
 
     func restoreDeletedImage(_ deleted: DeletedImage) {
-        guard !isDecoySession else { return }
         do {
             var restored = try store.restoreFromTrash(deleted)
             if restored.folderID == nil || !folders.contains(where: { $0.id == restored.folderID }) {
@@ -212,7 +199,6 @@ final class LibraryViewModel {
     }
 
     func permanentlyDeleteDeletedImage(_ deleted: DeletedImage) {
-        guard !isDecoySession else { return }
         do {
             try store.permanentlyDeleteFromTrash(deleted)
             deletedImages.removeAll { $0.id == deleted.id }
@@ -223,7 +209,6 @@ final class LibraryViewModel {
     }
 
     func emptyDeletedImages() {
-        guard !isDecoySession else { return }
         do {
             try store.emptyTrash()
             deletedImages = []
@@ -234,7 +219,6 @@ final class LibraryViewModel {
     }
 
     func restoreAllDeletedImages() {
-        guard !isDecoySession else { return }
         let items = deletedImages
         guard !items.isEmpty else { return }
         var restoredAny = false
@@ -260,9 +244,9 @@ final class LibraryViewModel {
         }
     }
 
-    /// Permanently deletes every album, photo, and Deleted Items entry.
+    /// Permanently deletes every album, photo, and Deleted Items entry in the
+    /// active library (real or decoy). Password settings clear only for the real library.
     func resetApp() {
-        guard !isDecoySession else { return }
         do {
             try store.resetAllLibraryData()
             folders = []
@@ -270,7 +254,9 @@ final class LibraryViewModel {
             deletedImages = []
             wantsClipboardImportPrompt = false
             errorMessage = nil
-            AppPasswordSettings.clearAll()
+            if !isDecoySession {
+                AppPasswordSettings.clearAll()
+            }
             ensureDefaultFolder()
             infoMessage = "App reset"
         } catch {
@@ -284,7 +270,7 @@ final class LibraryViewModel {
     }
 
     private func moveImagesToTrash(_ selected: [LibraryImage]) {
-        guard !isDecoySession, !selected.isEmpty else { return }
+        guard !selected.isEmpty else { return }
         var movedIDs = Set<UUID>()
         for image in selected {
             do {
@@ -333,7 +319,6 @@ final class LibraryViewModel {
     }
 
     func offerClipboardImportIfNeeded() {
-        guard !isDecoySession else { return }
         guard allowsAutomaticClipboardImport else { return }
         // Require a real image on the pasteboard, not just any clipboard content.
         guard ClipboardImageService.hasImage else { return }
@@ -349,7 +334,6 @@ final class LibraryViewModel {
 
     func pasteFromClipboard(into folderID: UUID) {
         wantsClipboardImportPrompt = false
-        guard !isDecoySession else { return }
         guard let data = ClipboardImageService.imageData() else {
             errorMessage = "No image found on the clipboard."
             return
@@ -361,7 +345,7 @@ final class LibraryViewModel {
     // MARK: - Import
 
     func importPickedPhotos(_ items: [PhotosPickerItem], into folderID: UUID) async {
-        guard !isDecoySession, !items.isEmpty else { return }
+        guard !items.isEmpty else { return }
         var imported = 0
         var hadDuplicate = false
         for item in items {
@@ -390,7 +374,6 @@ final class LibraryViewModel {
     }
 
     func importFileURLs(_ urls: [URL], into folderID: UUID) {
-        guard !isDecoySession else { return }
         var imported = 0
         var hadDuplicate = false
         for url in urls {
@@ -469,7 +452,6 @@ final class LibraryViewModel {
         sourceLabel: String?,
         preferredExtension: String?
     ) throws {
-        guard !isDecoySession else { return }
         let image = try store.importImageData(
             data,
             folderID: folderID,
@@ -495,7 +477,6 @@ final class LibraryViewModel {
     }
 
     private func persist() {
-        guard !isDecoySession else { return }
         do {
             try store.save(LibrarySnapshot(folders: folders, images: images))
         } catch {

@@ -381,6 +381,14 @@ struct FoldersListView: View {
                                     Label("Rename", systemImage: "pencil")
                                 }
 
+                                if viewModel.canPasteFromClipboard {
+                                    Button {
+                                        viewModel.pasteFromClipboard(into: folder.id)
+                                    } label: {
+                                        Label("Paste", systemImage: "doc.on.clipboard")
+                                    }
+                                }
+
                                 Button(role: .destructive) {
                                     folderToDelete = folder
                                 } label: {

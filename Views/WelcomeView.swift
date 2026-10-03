@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct WelcomeView: View {
-    /// `true` unlocks the real library; `false` opens an empty decoy session.
+    /// `true` unlocks the real library; `false` opens the persistent decoy library.
     var onStart: (_ unlocked: Bool) -> Void
 
     @AppStorage(AppPasswordSettings.protectionEnabledKey) private var passwordProtectionEnabled = false

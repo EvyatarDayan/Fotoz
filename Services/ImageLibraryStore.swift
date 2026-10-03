@@ -27,15 +27,19 @@ enum ImageLibraryStoreError: LocalizedError {
 }
 
 final class ImageLibraryStore {
-    static let shared = ImageLibraryStore()
+    /// Real library (correct password).
+    static let shared = ImageLibraryStore(directoryName: "FotozLibrary")
+    /// Decoy library (wrong / empty password) — fully functional, separate on disk.
+    static let decoy = ImageLibraryStore(directoryName: "FotozLibraryDecoy")
 
     private let fileManager = FileManager.default
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let directoryName: String
 
     var rootURL: URL {
         fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("FotozLibrary", isDirectory: true)
+            .appendingPathComponent(directoryName, isDirectory: true)
     }
 
     var imagesDirectoryURL: URL {
@@ -54,7 +58,8 @@ final class ImageLibraryStore {
         rootURL.appendingPathComponent("trash.json")
     }
 
-    private init() {
+    private init(directoryName: String) {
+        self.directoryName = directoryName
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         ensureDirectoriesExist()
     }

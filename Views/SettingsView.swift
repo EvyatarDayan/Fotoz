@@ -25,46 +25,57 @@ struct SettingsView: View {
 
             List {
                 Section {
-                    Toggle(isOn: $darkModeEnabled) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "moon.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 30, height: 30)
-                                .background(Color.blue, in: Circle())
+                    HStack(spacing: 12) {
+                        Image(systemName: "moon.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                            .background(Color.blue, in: Circle())
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Dark Mode")
-                                Text("Enable dark mode")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .tint(.green)
-                    .padding(.vertical, 4)
-
-                    Toggle(isOn: passwordProtectionBinding) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 30, height: 30)
-                                .background(Color.indigo, in: Circle())
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Password Protection")
-                                Text(
-                                    passwordProtectionEnabled
-                                        ? "Required on welcome screen"
-                                        : "Off — welcome opens freely"
-                                )
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Dark Mode")
+                            Text("Enable dark mode")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                            }
                         }
+
+                        Spacer(minLength: 8)
+
+                        Toggle("", isOn: $darkModeEnabled)
+                            .labelsHidden()
+                            .tint(.green)
+                            .scaleEffect(0.78)
+                            .frame(width: 40, height: 24)
                     }
-                    .tint(.green)
+                    .padding(.vertical, 4)
+
+                    HStack(spacing: 12) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                            .background(Color.indigo, in: Circle())
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Password Protection")
+                            Text(
+                                passwordProtectionEnabled
+                                    ? "Required on welcome screen"
+                                    : "Off — welcome opens freely"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Toggle("", isOn: passwordProtectionBinding)
+                            .labelsHidden()
+                            .tint(.green)
+                            .scaleEffect(0.78)
+                            .frame(width: 40, height: 24)
+                            .disabled(viewModel.isDecoySession)
+                    }
                     .padding(.vertical, 4)
                     .disabled(viewModel.isDecoySession)
 
